@@ -1,0 +1,182 @@
+{
+    "relationships": [
+        {
+            "oplan": "SG Rules",
+            "to_oplan": "SG",
+            "type": "depends"
+        },
+        {
+            "oplan": "Linux VM",
+            "to_oplan": "SG",
+            "type": "depends"
+        },
+        {
+            "oplan": "SG Rules",
+            "to_oplan": "SG Application",
+            "type": "depends"
+        }
+    ],
+    "description": "orchestration template to launch VM, create security group and attach it to the VM.",
+    "schedule": {
+        "start_time": "2017-02-20T13:50:48Z",
+        "stop_time": null
+    },
+    "parameters": {
+        "shape": {
+            "description": "Instance Type",
+            "type": "string",
+            "default": "oc3",
+            "source": "shape.list_shape"
+        },
+        "image": {
+            "description": "Image to launch the VM eg: /identity-domain/username/image-name",
+            "type": "string",
+            "source": "image.list_image"
+        },
+        "instance_name": {
+            "description": "Name for the VM to be launched eg: /identity-domain/username/instance-name",
+            "type": "string"
+        },
+        "orchestration_name": {
+            "description": "Name to launch the orchestration eg: /identity-domain/username/orchestration_name",
+            "type": "string"
+        },
+        "sg_name": {
+            "description": "Name to create security group eg: /identity-domain/username/sg_name",
+            "type": "string"
+        },
+        "source_list": {
+            "description": "Source should be existing security ip or security group list eg: seciplist:/identity-domain/username/iplist-name",
+            "type": "string"
+        },
+        "destination_list": {
+            "description": "Destination should be a security group eg: seclist:/identity-domain/username/securitygroup_name",
+            "type": "string",
+            "source": "security.list_security"
+        },
+        "SSH_key": {
+            "description": "Existing key to attach. eg: /identity-domain/username/key_name",
+            "type": "string",
+            "source": "sshkeys.list_sshkeys"
+        },
+        "security_application": {
+            "description": "Security Application to be created. eg: /identity-domain/username/application_name",
+            "type": "string"
+        },
+        "security_rule_nrpe": {
+            "description": "Security rule to be created for nrpe. eg: /identity-domain/username/rule_name",
+            "type": "string"
+        },
+        "security_rule_ssh": {
+            "description": "Security rule to be created for ssh. eg: /identity-domain/username/rule_name",
+            "type": "string"
+        },
+        "destination_port": {
+            "description": "Port to be associated with Security Application.Port should be under TCP category",
+            "type": "number",
+            "default": 5666
+        }
+    },
+    "oplans": [
+        {
+            "obj_type": "launchplan",
+            "label": "Linux VM",
+            "objects": [
+                {
+                    "instances": [
+                        {
+                            "shape": {
+                                "get_param": "shape"
+                            },
+                            "label": "Linux VM",
+                            "imagelist": {
+                                "get_param": "image"
+                            },
+                            "name": {
+                                "get_param": "instance_name"
+                            },
+                            "sshkeys": [
+                                {
+                                    "get_param": "SSH_key"
+                                }
+                            ],
+                            "networking": {
+                                "eth0": {
+                                    "seclists": [
+                                        {
+                                            "get_param": "sg_name"
+                                        }
+                                    ],
+                                    "nat": "ippool:/oracle/public/ippool"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "obj_type": "secapplication",
+            "label": "SG Application",
+            "objects": [
+                {
+                    "name": {
+                        "get_param": "security_application"
+                    },
+                    "dport": {
+                        "get_param": "destination_port"
+                    },
+                    "protocol": "tcp"
+                }
+            ]
+        },
+        {
+            "obj_type": "seclist",
+            "label": "SG",
+            "objects": [
+                {
+                    "name": {
+                        "get_param": "sg_name"
+                    }
+                }
+            ]
+        },
+        {
+            "label": "SG Rules",
+            "obj_type": "secrule",
+            "objects": [
+                {
+                    "name": {
+                        "get_param": "security_rule_ssh"
+                    },
+                    "application": "/oracle/public/ssh",
+                    "src_list": {
+                        "get_param": "source_list"
+                    },
+                    "dst_list": {
+                        "get_param": "destination_list"
+                    },
+                    "action": "PERMIT"
+                },
+                {
+                    "name": {
+                        "get_param": "security_rule_nrpe"
+                    },
+                    "application": {
+                        "get_param": "security_application"
+                    },
+                    "src_list": {
+                        "get_param": "source_list"
+                    },
+                    "dst_list": {
+                        "get_param": "destination_list"
+                    },
+                    "action": "PERMIT"
+                }
+            ]
+        }
+    ],
+    "name": {
+        "get_param": "orchestration_name"
+    }
+}

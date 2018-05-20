@@ -1,0 +1,144 @@
+---
+version: '2.0'
+
+usage_cost:
+  type: direct
+  description: This template is used for getting aws resource usage count and their sum of cost.
+
+  input:
+    to_email:
+      description: To mail id
+      label: to_email
+      type: string
+
+    Bill_Scheduled_bucket_name:
+      description: Aws billing schedlued bucket name
+      label: Bill_Scheduled_bucket_name
+      type: string
+
+    Billing_filename:
+      description: Aws billing bucket name
+      label: Billing_file_name
+      type: string
+      default: 'aws-billing-csv-'
+
+  tasks:
+    get_vm_count:
+      action: aws.get_all_instances
+      publish:
+        vm_count: <% $.get_vm_count.len() %>
+        running_vm_count: <% $.get_vm_count.where($['_state'].name = 'running').len() %>
+      on-success:
+        - get_volume_count
+
+    get_volume_count:
+      action: aws.get_all_volumes
+      publish:
+        volume_count: <% $.get_volume_count.len() %>
+        gp2_count: <% $.get_volume_count.where($.type = 'gp2').len() %>
+        io1_count: <% $.get_volume_count.where($.type = 'io1').len() %>
+        st1_count: <% $.get_volume_count.where($.type = 'st1').len() %>
+        sc1_count: <% $.get_volume_count.where($.type = 'sc1').len() %>
+        standard_count: <% $.get_volume_count.where($.type = 'standard').len() %>
+      on-success:
+        - get_snapshot_count
+
+    get_snapshot_count:
+      action: aws.get_all_snapshots owner='self'
+      publish:
+        snapshot_count: <% $.get_snapshot_count.len() %>
+      on-success:
+        - get_ip_count
+
+    get_ip_count:
+      action: aws.get_all_addresses
+      publish:
+        ip_count: <% $.get_ip_count.len() %>
+      on-success:
+        - get_keypair_count
+
+    get_keypair_count:
+      action: aws.get_all_key_pairs
+      publish:
+        keypair_count: <% $.get_keypair_count.len() %>
+      on-success:
+        - get_security_group_count
+
+    get_security_group_count:
+      action: aws.get_all_security_groups
+      publish:
+        security_group_count: <% $.get_security_group_count.len() %>
+      on-success:
+        - fetch_task
+
+    fetch_task:
+      action: aws_s3.fetch_file
+      input:
+        bucket_name: <% $.Bill_Scheduled_bucket_name %>
+        filename: <% $.Billing_filename %>
+        log_path: '/tmp/aws_bill/'
+      publish:
+        fetch_output: <% $.fetch_task.fetch_file %>
+      on-success:
+        - fetch_cost
+      on-error:
+        - send_stat
+
+    fetch_cost:
+      action: aws_s3.fetch_cost
+      input:
+        file_location: <% $.fetch_output %>
+      publish:
+        fetch_cost: <% $.fetch_cost %>
+        StartDate: <% $.fetch_cost.StartDate %>
+        EndDate: <% $.fetch_cost.EndDate %>
+        TotalCost: <% $.fetch_cost.TotalCost %>
+        CurrentDate: <% $.fetch_cost.CurrentDate %>
+      on-success:
+        - send_stat
+
+    send_stat:
+      join: 1
+      action: core.send_email
+      input:
+        # Email settings.
+        to_email: <% $.to_email %>
+        subject: <% $.openstack.project_name %> Account Resource Summary
+        # Report body data.
+        body: |
+          Utilization: <br /><br />
+
+          Number of virtual machines: <% $.vm_count %><br />
+          Number of Running virtual machines: <% $.running_vm_count %><br />
+          Number of Volumes: <% $.volume_count %><br />
+          Number of General Purpose SSD Volumes: <% $.gp2_count %><br />
+          Number of Provisioned IOPS SSD Volumes: <% $.io1_count %><br />
+          Number of Throughput Optimized HDD Volumes: <% $.st1_count %><br />
+          Number of Cold HDD Volumes: <% $.sc1_count %><br />
+          Number of Magnetic Volumes: <% $.standard_count %><br />
+          Number of Snapshots: <% $.snapshot_count %><br />
+          Number of IPs: <% $.ip_count %><br />
+          Number of Keypairs: <% $.keypair_count %><br />
+          Number of Security Groups: <% $.security_group_count %><br /><br />
+
+          Total usage cost for the period <% $.StartDate %> to <% $.CurrentDate %> : USD <% $.TotalCost %><br /><br />
+
+          -- Corestack Team.
+
+  output:
+    Number of Virtual Machines: <% $.vm_count %>
+    Number of Running Virtual Machines: <% $.running_vm_count %>
+    Number of Volumes: <% $.volume_count %>
+    Number of General Purpose SSD Volumes: <% $.gp2_count %>
+    Number of Provisioned IOPS SSD Volumes: <% $.io1_count %>
+    Number of Throughput Optimized HDD Volumes: <% $.st1_count %>
+    Number of Cold HDD Volumes: <% $.sc1_count %>
+    Number of Magnetic Volumes: <% $.standard_count %>
+    Number of Snapshots: <% $.snapshot_count %>
+    Number of IPs: <% $.ip_count %>
+    Number of Keypairs: <% $.keypair_count %>
+    Number of Security Groups: <% $.security_group_count %>
+    StartDate: <% $.StartDate %>
+    EndDate: <% $.EndDate %>
+    TotalCost: <% $.TotalCost %>
+

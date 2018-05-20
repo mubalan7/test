@@ -1,0 +1,47 @@
+---
+heat_template_version: 2013-05-23
+
+description: Template to create a general purpose volume in aws public cloud.
+
+parameter_groups:
+  - label: Create_Volume
+    description: Parameters for Creating a general purpose volume in aws
+    parameters:
+      - Volume_Name
+      - Size
+      - AvailabilityZone
+
+parameters:
+  AvailabilityZone:
+    description: AWS Availability Zone in which the Volume Storage to be provisioned. Availability Zone is an isolated location under a Region (geographical area)
+    label: Availability_Zone
+    type: string
+
+  Size:
+    description: The Size of the volume storage in GigaBytes (GBs)
+    label: Volume Size (in GB)
+    type: number
+    constraints:
+    - range: { min: 1 }
+
+  Volume_Name:
+    description: Name for the Volume to be provisioned.  Name is nothing but a tag to quickly to identify resources in AWS. Name need not be unique and can be of user choice
+    label: Volume_Name
+    type: string
+
+resources:
+  Create_Volume:
+    type: CAWS::EC2::Volume
+    properties:
+      AvailabilityZone: { get_param: AvailabilityZone }
+      Size: { get_param: Size }
+      Tags:
+        -
+          Key: Name
+          Value: { get_param: Volume_Name }
+      VolumeType: gp2
+
+outputs:
+  Volume_Id:
+    description: Id of created AWS volume.
+    value: { get_resource: Create_Volume }
